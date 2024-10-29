@@ -29,7 +29,7 @@
         window.setVideo = function() {
             const videoLink = document.getElementById("video-link").value;
             const videoId = new URL(videoLink).searchParams.get("v");
-            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1`;
+            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
 
             // Set video in Firebase
             set(ref(database, "video/current"), {
@@ -50,7 +50,7 @@
                 }
             });
 
-            // Sync timestamp and play on both devices
+            // Sync video state on play button click
             const player = video.contentWindow;
 
             // Listen for video state changes and sync them
@@ -68,11 +68,12 @@
                 }
             });
 
-            // Sync video state on timestamp change
+            // Sync play command
             video.addEventListener("load", () => {
-                setInterval(() => {
-                    player.postMessage('{"event":"command","func":"getPlayerState","args":""}', '*');
-                }, 1000);
+                // Send play command on click
+                video.contentWindow.addEventListener("click", () => {
+                    player.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                });
             });
         };
     </script>
