@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Together - Hello Kitty Theme</title>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_-URaV17-V5SilRt19lX_WkvSy-BANrg",
+            authDomain: "for-mommy.firebaseapp.com",
+            projectId: "for-mommy",
+            storageBucket: "for-mommy.appspot.com",
+            messagingSenderId: "930051072385",
+            appId: "1:930051072385:web:ee49fac455f1785fad0880",
+            measurementId: "G-F8CY04GZM6",
+            databaseURL: "https://for-mommy-default-rtdb.firebaseio.com/"
+        };
+
+        // Initialize Firebase and Realtime Database
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        window.setVideo = function() {
+            const videoLink = document.getElementById("video-link").value;
+            const videoId = videoLink.split("v=")[1];
+            document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+        };
+
+        // Sync video timestamp to Firebase
+        window.syncVideo = function() {
+            const video = document.getElementById("video").contentWindow;
+            video.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*');
+
+            window.addEventListener("message", (event) => {
+                const currentTime = event.data;
+                if (typeof currentTime === "number") {
+                    set(ref(database, "video/sync"), {
+                        timestamp: currentTime
+                    });
+                }
+            });
+        };
+
+        // Listen for updates to the sync timestamp in Firebase
+        window.onload = function() {
+            const video = document.getElementById("video").contentWindow;
+
+            // Keep video timestamp updated with Firebase changes
+            const timestampRef = ref(database, "video/sync");
+            onValue(timestampRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    video.postMessage(`{"event":"command","func":"seekTo","args":[${data.timestamp}, true]}`, '*');
+                }
+            });
+        };
+    </script>
+
+    <!-- Styling -->
+    <style>
+        /* Basic styling for the page */
+        body {
+            font-family: Arial, sans-serif;
+            background: url('https://media.discordapp.net/attachments/1211755846544003115/1300605752351653939/2Q.png?ex=672172ff&is=6720217f&hm=3ac58b521e0d9486c31ff1a2fde12816081b9ca21140b52c6b27f1f4cbc17d73&=&format=webp&quality=lossless') no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #tv-container {
+            width: 640px;
+            padding: 20px;
+            background-color: #ffd1e8;
+            border: 5px solid #ff5f9e;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #ff69b4;
+            margin: 10px 0;
+        }
+
+        #video-link {
+            width: 80%;
+            padding: 8px;
+            border: 2px solid #ff5f9e;
+            border-radius: 8px;
+            outline: none;
+            margin-top: 10px;
+        }
+
+        #set-video-button, #sync-video-button {
+            margin-top: 10px;
+            background-color: #ff5f9e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        #video-container {
+            margin-top: 20px;
+            border: 5px solid #ff5f9e;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        iframe {
+            width: 100%;
+            height: 360px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="tv-container">
+    <h1>Watch Together - Hello Kitty TV</h1>
+    <input type="text" id="video-link" placeholder="Enter YouTube video link" />
+    <button id="set-video-button" onclick="setVideo()">Set Video</button>
+
+    <div id="video-container">
+        <iframe id="video" frameborder="0" allowfullscreen></iframe>
+    </div>
+
+    <button id="sync-video-button" onclick="syncVideo()">Sync Video</button>
+</div>
+
+</body>
+</html>
