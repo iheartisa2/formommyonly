@@ -29,8 +29,16 @@
         // Function to set the video source
         window.setVideo = function() {
             const videoLink = document.getElementById("video-link").value;
-            const videoId = videoLink.split("v=")[1].split("&")[0]; // Extract the video ID
-            document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1`;
+            const videoId = videoLink.split("v=")[1]?.split("&")[0]; // Extract the video ID
+
+            if (videoId) {
+                document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+                // Resetting the video playback when a new video is set
+                const video = document.getElementById("video").contentWindow;
+                video.postMessage('{"event":"command","func":"stopVideo","args":""}', '*');
+            } else {
+                console.error("Invalid YouTube URL");
+            }
         };
 
         // Function to sync video timestamp to Firebase
@@ -38,16 +46,13 @@
             const video = document.getElementById("video").contentWindow;
             video.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*');
 
-            // Listen for message from YouTube iframe
+            // Listen for message from the video iframe
             window.addEventListener("message", (event) => {
-                if (event.origin !== "https://www.youtube.com") {
-                    console.error("Invalid origin:", event.origin);
-                    return;
-                }
-
-                const currentTime = event.data;
-                if (typeof currentTime === "number") {
-                    // Write the current timestamp to Firebase
+                if (event.origin !== "https://www.youtube.com") return; // Check origin
+                const data = JSON.parse(event.data);
+                if (data.event === "infoDelivery" && typeof data.info.currentTime === "number") {
+                    const currentTime = data.info.currentTime;
+                    console.log("Current time:", currentTime); // Debug log
                     set(ref(database, "video/sync"), {
                         timestamp: currentTime
                     });
@@ -63,9 +68,9 @@
             const timestampRef = ref(database, "video/sync");
             onValue(timestampRef, (snapshot) => {
                 const data = snapshot.val();
-                if (data) {
+                if (data && typeof data.timestamp === "number") {
+                    console.log("Syncing to timestamp:", data.timestamp); // Debug log
                     video.postMessage(`{"event":"command","func":"seekTo","args":[${data.timestamp}, true]}`, '*');
-                    video.postMessage('{"event":"command","func":"playVideo","args":""}', '*'); // Play the video
                 }
             });
         };
@@ -73,6 +78,7 @@
 
     <!-- Styling -->
     <style>
+        /* Basic styling for the page */
         body {
             font-family: Arial, sans-serif;
             background: url('https://media.discordapp.net/attachments/1211755846544003115/1300605752351653939/2Q.png?ex=672172ff&is=6720217f&hm=3ac58b521e0d9486c31ff1a2fde12816081b9ca21140b52c6b27f1f4cbc17d73&=&format=webp&quality=lossless') no-repeat center center fixed;
