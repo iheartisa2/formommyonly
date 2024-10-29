@@ -29,34 +29,13 @@
         window.setVideo = function() {
             const videoLink = document.getElementById("video-link").value;
             const videoId = new URL(videoLink).searchParams.get("v");
-            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1`;
-            document.getElementById("video").src = videoSrc;
+            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1`;
 
             // Set video in Firebase
             set(ref(database, "video/current"), {
                 videoSrc: videoSrc
             });
         };
-
-        // Update the Firebase database with the current timestamp
-        function updateTimestamp() {
-            const video = document.getElementById("video");
-            const player = video.contentWindow;
-
-            // Post message to get current time
-            player.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*');
-
-            // Listen for the message with the current time
-            window.addEventListener("message", (event) => {
-                const data = JSON.parse(event.data);
-                if (data.event === "onGetCurrentTime") {
-                    const currentTime = data.info.currentTime;
-                    set(ref(database, "video/sync"), {
-                        timestamp: currentTime
-                    });
-                }
-            });
-        }
 
         // Sync video and timestamp from Firebase
         window.onload = function() {
@@ -71,24 +50,35 @@
                 }
             });
 
-            // Keep video timestamp updated with Firebase changes
-            const timestampRef = ref(database, "video/sync");
-            onValue(timestampRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    const player = video.contentWindow;
-                    player.postMessage(`{"event":"command","func":"seekTo","args":[${data.timestamp}, true]}`, '*');
+            // Sync timestamp and play on both devices
+            const player = video.contentWindow;
+
+            // Listen for video state changes and sync them
+            window.addEventListener("message", (event) => {
+                const data = JSON.parse(event.data);
+                if (data.event === "onStateChange") {
+                    const playerState = data.info.playerState;
+
+                    // If the video is playing, send the play command to the other device
+                    if (playerState === 1) {
+                        player.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                    } else if (playerState === 2) {
+                        player.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+                    }
                 }
             });
 
-            // Update the timestamp every second while the video is playing
-            setInterval(updateTimestamp, 1000); // Update every second
+            // Sync video state on timestamp change
+            video.addEventListener("load", () => {
+                setInterval(() => {
+                    player.postMessage('{"event":"command","func":"getPlayerState","args":""}', '*');
+                }, 1000);
+            });
         };
     </script>
 
     <!-- Styling -->
     <style>
-        /* Basic styling for the page */
         body {
             font-family: Arial, sans-serif;
             background: url('https://media.discordapp.net/attachments/1211755846544003115/1300605752351653939/2Q.png?ex=672172ff&is=6720217f&hm=3ac58b521e0d9486c31ff1a2fde12816081b9ca21140b52c6b27f1f4cbc17d73&=&format=webp&quality=lossless') no-repeat center center fixed;
