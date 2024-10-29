@@ -26,59 +26,55 @@
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
 
-        let player;
+        window.setVideo = function() {
+            const videoLink = document.getElementById("video-link").value;
+            const videoId = new URL(videoLink).searchParams.get("v");
+            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1`;
 
-        window.onYouTubeIframeAPIReady = function() {
+            // Set video in Firebase
+            set(ref(database, "video/current"), {
+                videoSrc: videoSrc
+            });
+        };
+
+        // Sync video and timestamp from Firebase
+        window.onload = function() {
+            const video = document.getElementById("video");
+
+            // Load video from Firebase
             const videoRef = ref(database, "video/current");
             onValue(videoRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data && data.videoSrc) {
-                    player = new YT.Player('video', {
-                        height: '360',
-                        width: '640',
-                        videoId: new URL(data.videoSrc).searchParams.get("v"),
-                        events: {
-                            'onStateChange': onPlayerStateChange
-                        }
-                    });
+                    document.getElementById("video").src = data.videoSrc;
                 }
             });
-        };
 
-        function setVideo() {
-            const videoLink = document.getElementById("video-link").value;
-            const videoId = new URL(videoLink).searchParams.get("v");
-            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+            // Sync timestamp and play on both devices
+            const player = video.contentWindow;
 
-            // Set video in Firebase
-            set(ref(database, "video/current"), {
-                videoSrc: videoSrc,
-                timestamp: 0
-            });
-        }
+            // Listen for video state changes and sync them
+            window.addEventListener("message", (event) => {
+                const data = JSON.parse(event.data);
+                if (data.event === "onStateChange") {
+                    const playerState = data.info.playerState;
 
-        function onPlayerStateChange(event) {
-            const currentTime = player.getCurrentTime();
-            // Update timestamp in Firebase when the state changes
-            set(ref(database, "video/current/timestamp"), currentTime);
-
-            if (event.data === YT.PlayerState.PLAYING) {
-                // Sync the video when played
-                const timestampRef = ref(database, "video/current/timestamp");
-                onValue(timestampRef, (snapshot) => {
-                    const time = snapshot.val();
-                    if (time !== undefined) {
-                        player.seekTo(time, true);
+                    // If the video is playing, send the play command to the other device
+                    if (playerState === 1) {
+                        player.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                    } else if (playerState === 2) {
+                        player.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
                     }
-                });
-            }
-        }
+                }
+            });
 
-        // Load YouTube API
-        const tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            // Sync video state on timestamp change
+            video.addEventListener("load", () => {
+                setInterval(() => {
+                    player.postMessage('{"event":"command","func":"getPlayerState","args":""}', '*');
+                }, 1000);
+            });
+        };
     </script>
 
     <!-- Styling -->
@@ -152,7 +148,7 @@
     <button id="set-video-button" onclick="setVideo()">Set Video</button>
 
     <div id="video-container">
-        <div id="video"></div> <!-- This is where the YouTube player will be embedded -->
+        <iframe id="video" frameborder="0" allowfullscreen></iframe>
     </div>
 </div>
 
