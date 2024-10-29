@@ -29,13 +29,21 @@
         window.setVideo = function() {
             const videoLink = document.getElementById("video-link").value;
             const videoId = new URL(videoLink).searchParams.get("v");
-            document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1`;
+            document.getElementById("video").src = videoSrc;
+
+            // Set video in Firebase
+            set(ref(database, "video/current"), {
+                videoSrc: videoSrc
+            });
         };
 
-        // Sync video timestamp to Firebase
-        window.syncVideo = function() {
+        // Update the Firebase database with the current timestamp
+        function updateTimestamp() {
             const video = document.getElementById("video");
             const player = video.contentWindow;
+
+            // Post message to get current time
             player.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*');
 
             // Listen for the message with the current time
@@ -48,11 +56,20 @@
                     });
                 }
             });
-        };
+        }
 
-        // Listen for updates to the sync timestamp in Firebase
+        // Sync video and timestamp from Firebase
         window.onload = function() {
             const video = document.getElementById("video");
+
+            // Load video from Firebase
+            const videoRef = ref(database, "video/current");
+            onValue(videoRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.videoSrc) {
+                    document.getElementById("video").src = data.videoSrc;
+                }
+            });
 
             // Keep video timestamp updated with Firebase changes
             const timestampRef = ref(database, "video/sync");
@@ -63,6 +80,9 @@
                     player.postMessage(`{"event":"command","func":"seekTo","args":[${data.timestamp}, true]}`, '*');
                 }
             });
+
+            // Update the timestamp every second while the video is playing
+            setInterval(updateTimestamp, 1000); // Update every second
         };
     </script>
 
@@ -105,7 +125,7 @@
             margin-top: 10px;
         }
 
-        #set-video-button, #sync-video-button {
+        #set-video-button {
             margin-top: 10px;
             background-color: #ff5f9e;
             color: white;
@@ -140,8 +160,6 @@
     <div id="video-container">
         <iframe id="video" frameborder="0" allowfullscreen></iframe>
     </div>
-
-    <button id="sync-video-button" onclick="syncVideo()">Sync Video</button>
 </div>
 
 </body>
