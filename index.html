@@ -38,7 +38,6 @@
                         width: '640',
                         videoId: new URL(data.videoSrc).searchParams.get("v"),
                         events: {
-                            'onReady': onPlayerReady,
                             'onStateChange': onPlayerStateChange
                         }
                     });
@@ -46,20 +45,10 @@
             });
         };
 
-        function onPlayerReady(event) {
-            const timestampRef = ref(database, "video/current/timestamp");
-            onValue(timestampRef, (snapshot) => {
-                const time = snapshot.val();
-                if (time !== undefined) {
-                    player.seekTo(time, true);
-                }
-            });
-        }
-
         function setVideo() {
             const videoLink = document.getElementById("video-link").value;
             const videoId = new URL(videoLink).searchParams.get("v");
-            const videoSrc = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+            const videoSrc = https://www.youtube.com/embed/${videoId}?enablejsapi=1;
 
             // Set video in Firebase
             set(ref(database, "video/current"), {
@@ -73,14 +62,16 @@
             // Update timestamp in Firebase when the state changes
             set(ref(database, "video/current/timestamp"), currentTime);
 
-            // Automatically seek to the latest timestamp from Firebase
-            const timestampRef = ref(database, "video/current/timestamp");
-            onValue(timestampRef, (snapshot) => {
-                const time = snapshot.val();
-                if (time !== undefined && event.data === YT.PlayerState.PLAYING) {
-                    player.seekTo(time, true);
-                }
-            });
+            if (event.data === YT.PlayerState.PLAYING) {
+                // Sync the video when played
+                const timestampRef = ref(database, "video/current/timestamp");
+                onValue(timestampRef, (snapshot) => {
+                    const time = snapshot.val();
+                    if (time !== undefined) {
+                        player.seekTo(time, true);
+                    }
+                });
+            }
         }
 
         // Load YouTube API
