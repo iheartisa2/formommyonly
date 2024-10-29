@@ -28,26 +28,35 @@
 
         window.setVideo = function() {
             const videoLink = document.getElementById("video-link").value;
-            const videoId = videoLink.split("v=")[1];
-            document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+            const videoIdMatch = videoLink.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|watch)\S*[?&]v=)|youtu\.be\/)([^&\n]{11})/);
+            if (videoIdMatch) {
+                const videoId = videoIdMatch[1];
+                document.getElementById("video").src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+            } else {
+                alert("Please enter a valid YouTube video link.");
+            }
         };
 
-        // Sync video timestamp to Firebase
         window.syncVideo = function() {
             const video = document.getElementById("video").contentWindow;
             video.postMessage('{"event":"command","func":"getCurrentTime","args":""}', '*');
 
             window.addEventListener("message", (event) => {
+                if (event.origin !== "https://www.youtube.com") {
+                    console.error("Invalid origin:", event.origin);
+                    return;
+                }
                 const currentTime = event.data;
                 if (typeof currentTime === "number") {
                     set(ref(database, "video/sync"), {
                         timestamp: currentTime
+                    }).catch(error => {
+                        console.error("Error writing to database:", error);
                     });
                 }
             });
         };
 
-        // Listen for updates to the sync timestamp in Firebase
         window.onload = function() {
             const video = document.getElementById("video").contentWindow;
 
