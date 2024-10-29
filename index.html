@@ -33,7 +33,8 @@
 
             // Set video in Firebase
             set(ref(database, "video/current"), {
-                videoSrc: videoSrc
+                videoSrc: videoSrc,
+                timestamp: 0
             });
         };
 
@@ -45,21 +46,29 @@
             const videoRef = ref(database, "video/current");
             onValue(videoRef, (snapshot) => {
                 const data = snapshot.val();
-                if (data && data.videoSrc) {
-                    document.getElementById("video").src = data.videoSrc;
+                if (data) {
+                    // Load video source
+                    if (data.videoSrc) {
+                        document.getElementById("video").src = data.videoSrc;
+                    }
+                    // Sync timestamp
+                    if (data.timestamp !== undefined) {
+                        video.contentWindow.postMessage(`{"event":"command","func":"seekTo","args":[${data.timestamp}, true]}`, '*');
+                    }
                 }
             });
-
-            // Sync video state on play button click
-            const player = video.contentWindow;
 
             // Listen for video state changes and sync them
             window.addEventListener("message", (event) => {
                 const data = JSON.parse(event.data);
                 if (data.event === "onStateChange") {
                     const playerState = data.info.playerState;
+                    const currentTime = data.info.currentTime;
 
-                    // If the video is playing, send the play command to the other device
+                    // Update timestamp in Firebase when the state changes
+                    set(ref(database, "video/current/timestamp"), currentTime);
+
+                    // Sync play/pause commands
                     if (playerState === 1) {
                         player.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
                     } else if (playerState === 2) {
@@ -68,11 +77,10 @@
                 }
             });
 
-            // Sync play command
+            // Play video on click
             video.addEventListener("load", () => {
-                // Send play command on click
                 video.contentWindow.addEventListener("click", () => {
-                    player.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                    video.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
                 });
             });
         };
